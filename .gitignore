@@ -1,0 +1,17 @@
+# Build artifacts
+/noenvy
+/dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code per-user settings (project settings.json is fine to commit)
+.claude/settings.local.json
+
+# noenvy's own test artifacts (never commit secrets)
+.env
+.env.*
+!.env.example
