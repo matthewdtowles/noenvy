@@ -161,13 +161,12 @@ func ensureGitignored(dir string, entries []string) ([]string, error) {
 	}
 
 	var buf strings.Builder
-	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
-		buf.WriteByte('\n')
-	}
-	if len(data) > 0 {
-		buf.WriteString("\n# added by noenvy\n")
-	} else {
+	if len(data) == 0 {
+		// New file — emit the source comment once.
 		buf.WriteString("# added by noenvy\n")
+	} else if !strings.HasSuffix(string(data), "\n") {
+		// Existing file without trailing newline — start a fresh line.
+		buf.WriteByte('\n')
 	}
 	for _, e := range toAppend {
 		buf.WriteString(e)
