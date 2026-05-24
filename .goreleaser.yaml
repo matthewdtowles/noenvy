@@ -1,0 +1,73 @@
+# GoReleaser v2 — https://goreleaser.com/customization/
+version: 2
+
+project_name: noenvy
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: noenvy
+    main: .
+    binary: noenvy
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/matthewdtowles/noenvy/cmd.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Windows on ARM is a small audience and avoids one build per release.
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+homebrew_casks:
+  - name: noenvy
+    binaries:
+      - noenvy
+    repository:
+      owner: matthewdtowles
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/matthewdtowles/noenvy"
+    description: "Encrypt .env files with your OS keyring and inject secrets into any command."
+    license: "MIT"
+    commit_msg_template: "noenvy {{ .Tag }}"

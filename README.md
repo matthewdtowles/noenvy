@@ -44,15 +44,31 @@ If your local machine is compromised, noenvy won't save you. Neither will any ot
 
 ## Install
 
-> Pre-release. Binary releases and a Homebrew tap are part of the v1 launch.
+### Homebrew (macOS / Linux)
 
-For now:
+```bash
+brew install matthewdtowles/tap/noenvy
+```
+
+### Direct binary download
+
+Grab the right archive for your OS/arch from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest), extract, and move `noenvy` somewhere on your `PATH`.
+
+On macOS, the binary is currently unsigned. The first time you run a downloaded binary you'll hit Gatekeeper. Either right-click → Open in Finder, or strip the quarantine bit once:
+
+```bash
+xattr -d com.apple.quarantine ./noenvy
+```
+
+(Brew installs sidestep this — Homebrew handles the quarantine attribute itself.)
+
+### From source
 
 ```bash
 go install github.com/matthewdtowles/noenvy@latest
 ```
 
-Or build from source:
+Or:
 
 ```bash
 git clone https://github.com/matthewdtowles/noenvy.git
