@@ -16,25 +16,30 @@ import (
 )
 
 var (
-	initEnvFile string
-	initForce   bool
+	initEnvFile      string
+	initForce        bool
+	initProjectLocal bool
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Encrypt the local .env file and store its key in the OS keyring",
 	Long: `Reads .env from the current directory, generates a new encryption key,
-stores it in the OS keyring, and writes an encrypted .noenvy file.
+stores it in the OS keyring, and writes an encrypted file.
 
-Also adds .env and .noenvy to .gitignore so neither is accidentally committed.
-If you want to commit the encrypted .noenvy file (so collaborators with the
-key can use it), remove that line from .gitignore yourself.`,
+By default the encrypted file lives at ~/.noenvy/projects/<project-id>, keyed
+to the project root (detected by walking up for .git, package.json, Cargo.toml,
+go.mod, or pyproject.toml). Pass --project to store it as .noenvy inside the
+project directory instead.
+
+.env is always added to .gitignore. In --project mode, .noenvy is also added.`,
 	RunE: runInit,
 }
 
 func init() {
 	initCmd.Flags().StringVar(&initEnvFile, "env-file", ".env", "path to the .env file to encrypt")
-	initCmd.Flags().BoolVar(&initForce, "force", false, "overwrite existing .noenvy and replace any existing keyring entry")
+	initCmd.Flags().BoolVar(&initForce, "force", false, "overwrite any existing encrypted file and replace the keyring entry")
+	initCmd.Flags().BoolVar(&initProjectLocal, "project", false, "store the encrypted file inside the project (.noenvy) instead of under ~/.noenvy")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -55,26 +60,37 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		return fmt.Errorf("read %s: %w", envPath, err)
 	}
-
 	if _, err := store.ParseEnv(plaintext); err != nil {
 		return fmt.Errorf("validate %s: %w", envPath, err)
 	}
 
-	noenvyPath := filepath.Join(cwd, store.Filename)
-	if _, err := os.Stat(noenvyPath); err == nil && !initForce {
-		return fmt.Errorf("%s already exists — pass --force to overwrite", noenvyPath)
-	}
-
-	projectID, err := project.ID(noenvyPath)
+	root, err := project.FindRoot(cwd)
 	if err != nil {
 		return err
+	}
+	projectID, err := project.ID(root)
+	if err != nil {
+		return err
+	}
+
+	var outPath string
+	if initProjectLocal {
+		outPath = store.InProjectPath(root)
+	} else {
+		outPath, err = store.CentralizedPath(projectID)
+		if err != nil {
+			return err
+		}
+	}
+
+	if _, err := os.Stat(outPath); err == nil && !initForce {
+		return fmt.Errorf("%s already exists — pass --force to overwrite", outPath)
 	}
 
 	key, err := cryptobox.NewKey()
 	if err != nil {
 		return err
 	}
-
 	blob, err := cryptobox.Encrypt(key, plaintext)
 	if err != nil {
 		return err
@@ -83,28 +99,44 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := keystore.Store(projectID, key); err != nil {
 		return fmt.Errorf("store key in OS keyring: %w", err)
 	}
-
-	if err := store.Write(noenvyPath, blob); err != nil {
-		return fmt.Errorf("write %s: %w", noenvyPath, err)
+	if err := store.Write(outPath, blob); err != nil {
+		return fmt.Errorf("write %s: %w", outPath, err)
 	}
 
-	added, err := ensureGitignored(cwd, []string{".env", store.Filename})
+	ignoreList := []string{filepath.Base(envPath)}
+	if initProjectLocal {
+		ignoreList = append(ignoreList, store.Filename)
+	}
+	added, err := ensureGitignored(root, ignoreList)
 	if err != nil {
-		// Non-fatal: encryption succeeded, just warn.
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not update .gitignore in %s: %v\n", root, err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Encrypted %s → %s\n", filepath.Base(envPath), store.Filename)
-	fmt.Fprintf(cmd.OutOrStdout(), "Key stored in OS keyring (service=%s, project=%s)\n", keystore.Service, projectID)
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "Encrypted %s → %s\n", displayPath(envPath, cwd), displayPath(outPath, cwd))
+	fmt.Fprintf(out, "Key stored in OS keyring (service=%s, project=%s)\n", keystore.Service, projectID)
 	if len(added) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "Added to .gitignore: %s\n", strings.Join(added, ", "))
+		fmt.Fprintf(out, "Added to %s/.gitignore: %s\n", displayPath(root, cwd), strings.Join(added, ", "))
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "\nNext: noenvy run -- <your command>")
+	fmt.Fprintln(out, "\nNext: noenvy run -- <your command>")
 	return nil
 }
 
+// displayPath returns a short, human-friendly rendering of a path: relative
+// to cwd if it's inside cwd, or as-is otherwise.
+func displayPath(path, cwd string) string {
+	if rel, err := filepath.Rel(cwd, path); err == nil && !strings.HasPrefix(rel, "..") {
+		if rel == "." {
+			return path
+		}
+		return rel
+	}
+	return path
+}
+
 // ensureGitignored appends any of entries that aren't already present in
-// .gitignore (creating it if needed). Returns the entries actually added.
+// <dir>/.gitignore (creating the file if needed). Returns the entries actually
+// added.
 func ensureGitignored(dir string, entries []string) ([]string, error) {
 	path := filepath.Join(dir, ".gitignore")
 	existing := map[string]bool{}

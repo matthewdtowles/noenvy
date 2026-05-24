@@ -66,25 +66,28 @@ Requires Go 1.22+ to build.
 
 ### `noenvy init`
 
-Reads `.env` from the current directory, generates a 32-byte AES key, stores it in your OS keyring, and writes an encrypted `.noenvy` file. Also appends `.env` and `.noenvy` to `.gitignore` so neither is accidentally committed.
+Reads `.env` from the current directory, generates a 32-byte AES key, stores the key in your OS keyring, and writes an encrypted file to `~/.noenvy/projects/<project-id>`. Adds `.env` to `.gitignore`.
 
 ```bash
 noenvy init
-# Encrypted .env → .noenvy
-# Key stored in OS keyring (service=noenvy, project=415ea1da76640376e5472fd293108a75)
-# Added to .gitignore: .env, .noenvy
+# Encrypted .env → /Users/you/.noenvy/projects/46655b8ade8b84e89b391fd6258f85e8
+# Key stored in OS keyring (service=noenvy, project=46655b8a…)
+# Added to .gitignore: .env
 ```
+
+The encrypted file lives in your home directory by default. The project it belongs to is identified by the project root path (detected by walking up for `.git`, `package.json`, `Cargo.toml`, `go.mod`, or `pyproject.toml`).
 
 Flags:
 
 - `--env-file <path>` — use a different source file (default `.env`)
-- `--force` — overwrite an existing `.noenvy` and replace the keyring entry
+- `--project` — store the encrypted file as `.noenvy` inside the project directory instead of under `~/.noenvy`. In this mode `.noenvy` is also added to `.gitignore`.
+- `--force` — overwrite any existing encrypted file and replace the keyring entry
 
-If you want to commit the encrypted `.noenvy` file (so collaborators with the key can use it), remove that line from `.gitignore` yourself.
+The encrypted file is **not designed to be committed** even though it would be safe to. Without the encryption key (which lives only in your local OS keyring and cannot be shared in v1), the file is just opaque bytes. Team sharing is out of scope for v1.
 
 ### `noenvy run -- <command>`
 
-Walks up from the current directory to find a `.noenvy` file, looks up its encryption key in the OS keyring, decrypts the secrets in memory, and exec's the given command with those secrets in its environment.
+Walks up from the current directory to find the project root, locates the encrypted file (centralized or `--project` mode — either works), decrypts it in memory with the keyring key, and exec's the given command with those secrets in its environment.
 
 ```bash
 noenvy run -- npm start
@@ -92,13 +95,13 @@ noenvy run -- pytest
 noenvy run -- env | grep API_KEY
 ```
 
-The `--` separator is recommended but optional — `noenvy run npm start` works too. Variables from `.noenvy` override any same-named variables in the parent environment.
+The `--` separator is recommended but optional — `noenvy run npm start` works too. Variables from the encrypted file override any same-named variables in the parent environment.
 
 Exit code from the child command is propagated.
 
 ## How it works
 
-**File format** (`.noenvy`):
+**File format** (encrypted file, regardless of layout):
 
 ```
 byte 0       version (currently 0x01)
@@ -108,9 +111,23 @@ bytes 13..N  ciphertext + 16-byte AES-GCM authentication tag
 
 AES-256-GCM via Go's `crypto/aes` and `crypto/cipher` stdlib. Nonce is generated per encryption from `crypto/rand`. Tamper detection is built in via GCM's authentication tag — modifying any byte of the file causes decryption to fail.
 
-**Key storage:** Keys live in the OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) under service name `noenvy` and an account name derived from the absolute path of the `.noenvy` file (SHA-256 hash, hex-encoded, first 32 chars). Keys never touch disk.
+**Storage layout (default — centralized):**
 
-**Project lookup:** `noenvy run` walks up from the current directory like `git` looking for a `.noenvy` file, then derives the keyring account name from its path.
+```
+~/.noenvy/
+└── projects/
+    └── <project-id>   # one encrypted file per project
+```
+
+`<project-id>` is the SHA-256 of the project root's absolute path, hex-encoded, first 32 chars.
+
+**Storage layout (`--project` mode):**
+
+The encrypted file lives at `<project-root>/.noenvy` instead, and `.noenvy` is added to `.gitignore` alongside `.env`. Useful if you prefer keeping per-project files inside the project directory.
+
+**Key storage:** Encryption keys live in the OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) under service name `noenvy` and an account name equal to the project ID. Keys never touch disk.
+
+**Project root detection:** `noenvy init` and `noenvy run` both walk up from the current directory looking for one of `.git`, `package.json`, `Cargo.toml`, `go.mod`, or `pyproject.toml`. First match wins (innermost project takes precedence — important for monorepos). If no marker is found, the current directory is used as the project root.
 
 ## Comparison to alternatives
 

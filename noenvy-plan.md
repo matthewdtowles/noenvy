@@ -52,7 +52,7 @@ This is the same threat model as every other local secret tool. Stating it build
 ## v1 scope (ruthlessly narrow)
 
 ### Core commands
-- `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted `.noenvy` file, add `.noenvy` to `.gitignore` if not already there (and optionally also `.env` if user wants)
+- `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted file to `~/.noenvy/projects/<project-id>` (default) or to `.noenvy` in the project (with `--project`), add `.env` to `.gitignore` always; add `.noenvy` to `.gitignore` in `--project` mode
 - `noenvy run -- <command>` — Decrypt in-memory, inject as env vars, exec the command, never write plaintext to disk
 - `noenvy add <KEY>` — Prompt for value, add to encrypted store
 - `noenvy remove <KEY>` — Remove a key from the encrypted store
@@ -94,33 +94,38 @@ Reasons:
 
 **Crypto design:**
 - Generate a random 32-byte key on `init`
-- Store key in OS keyring under a service name like `noenvy` and account name derived from project path or user-provided project ID
-- Encrypt with AES-256-GCM, store nonce + ciphertext in `.noenvy` file
-- File format: version byte + nonce + ciphertext + auth tag (keep it simple, document it)
+- Store key in OS keyring under service name `noenvy` and account name = project ID
+- Encrypt with AES-256-GCM, store version byte + nonce + ciphertext + auth tag in the encrypted file
+- File format: version byte (0x01) + 12-byte nonce + ciphertext + 16-byte auth tag (keep it simple, document it)
 
 ---
 
 ## Architecture
 
 ```
-~/.config/noenvy/             # global config (which keyring entries map to which projects)
-./project/.env                # input (gitignored, user-managed)
-./project/.noenvy             # encrypted output (committed or gitignored, user choice)
-OS Keyring                    # holds encryption key, never touches disk
+~/.noenvy/projects/<project-id>   # encrypted output (default — centralized)
+./project/.env                    # input (gitignored, user-managed)
+./project/.noenvy                 # encrypted output (only when --project mode; gitignored)
+OS Keyring                        # holds encryption key, never touches disk
 ```
 
+**Storage default is centralized.** Encrypted files are not designed to be committed in v1 — without the encryption key (which never leaves the local OS keyring), the file is opaque bytes. Team sharing of keys is explicitly out of scope. The `--project` opt-in puts the file inside the project directory for users who prefer keeping per-project files there; it is also gitignored.
+
 **Flow for `noenvy run -- npm start`:**
-1. Read `.noenvy` from current dir (walk up if needed, like git)
-2. Look up encryption key from OS keyring using project identifier
-3. Decrypt in memory
-4. Parse key-value pairs
-5. Fork-exec the child command with env vars set (`os/exec` with `Env` field)
-6. Stream stdout/stderr through, propagate exit code
-7. Never write decrypted values to disk
+1. Walk up from cwd looking for `.git`, `package.json`, `Cargo.toml`, `go.mod`, or `pyproject.toml` to find the project root (fall back to cwd)
+2. Compute project ID = SHA-256(absolute project root path)[:32]
+3. Locate the encrypted file: prefer in-project `<root>/.noenvy`, fall back to `~/.noenvy/projects/<project-id>`
+4. Look up encryption key from OS keyring using project ID
+5. Decrypt in memory
+6. Parse key-value pairs
+7. Fork-exec the child command with env vars set (`os/exec` with `Env` field)
+8. Stream stdout/stderr through, propagate exit code
+9. Never write decrypted values to disk
 
 **Project identification:**
-- Default: hash of absolute path to `.noenvy` file → used as keyring account name
-- Override: user can specify a project ID in a `.noenvy.toml` config file for cases where path changes (laptop migration, etc.)
+- Project ID derived from the project root's absolute path (SHA-256, hex, first 32 chars)
+- Used as both the keyring account name and the filename in centralized storage
+- Future: a `.noenvy.toml` config could let users override the project ID for cases where paths change (laptop migration, etc.) — deferred
 
 ---
 
