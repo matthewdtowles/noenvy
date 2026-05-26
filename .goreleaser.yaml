@@ -42,6 +42,20 @@ archives:
       - goos: windows
         formats: [zip]
 
+nfpms:
+  - id: packages
+    package_name: noenvy
+    vendor: matthewdtowles
+    homepage: "https://github.com/matthewdtowles/noenvy"
+    maintainer: "Matthew Towles <matthewdtowles@gmail.com>"
+    description: "Encrypt .env files with your OS keyring and inject secrets into any command."
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/local/bin
+
 checksum:
   name_template: 'checksums.txt'
   algorithm: sha256

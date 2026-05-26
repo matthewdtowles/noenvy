@@ -44,15 +44,36 @@ If your local machine is compromised, noenvy won't save you. Neither will any ot
 
 ## Install
 
-### Homebrew (macOS / Linux)
+### macOS — Homebrew
 
 ```bash
 brew install matthewdtowles/tap/noenvy
 ```
 
-### Direct binary download
+### Linux — `.deb` / `.rpm` / `.apk`
 
-Grab the right archive for your OS/arch from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest), extract, and move `noenvy` somewhere on your `PATH`.
+Download the package for your distro from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest) and install:
+
+```bash
+# Debian / Ubuntu / Mint / Pop!_OS / Kali
+sudo dpkg -i noenvy_*_linux_amd64.deb
+
+# Fedora / RHEL / CentOS / Rocky
+sudo rpm -i noenvy_*_linux_amd64.rpm
+
+# Alpine
+sudo apk add --allow-untrusted noenvy_*_linux_amd64.apk
+```
+
+Replace `amd64` with `arm64` if you're on ARM.
+
+### Windows — direct download
+
+Grab `noenvy_*_windows_x86_64.zip` from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest), extract, and put `noenvy.exe` somewhere on your `PATH`.
+
+### Direct binary download (any platform)
+
+If a package isn't available for your setup, grab the tarball/zip from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest), extract, and move the binary onto your `PATH`.
 
 On macOS, the binary is currently unsigned. The first time you run a downloaded binary you'll hit Gatekeeper. Either right-click → Open in Finder, or strip the quarantine bit once:
 
@@ -77,6 +98,22 @@ go build -o noenvy .
 ```
 
 Requires Go 1.22+ to build.
+
+### Platform support
+
+noenvy uses the operating system's secure credential store for the encryption key. Platform support depends on whether that store is available:
+
+| Platform | Credential store | Status |
+|---|---|---|
+| macOS | Keychain | ✅ Works out of the box |
+| Windows | Credential Manager | ✅ Works out of the box |
+| Linux desktop (GNOME / KDE / similar) | Secret Service (gnome-keyring or KWallet) | ✅ Works when the keyring daemon is running (default in most desktop distros) |
+| Headless Linux servers | None by default | ❌ Not supported in v1 |
+| Docker containers | None by default | ❌ Not supported in v1 |
+| WSL2 (Linux on Windows) | None by default | ❌ Not supported in v1 unless you install and run a Secret Service implementation manually |
+| Devcontainers / Codespaces / remote SSH dev | None by default | ❌ Not supported in v1 |
+
+If you hit `failed to access keyring` or similar errors on Linux, your system likely doesn't have a Secret Service implementation running. A passphrase-protected file backend is on the roadmap for headless and WSL2 cases.
 
 ## Usage
 
