@@ -59,7 +59,7 @@ The workflow can create it, but it's cleaner to seed it first so GitHub Pages ha
 git switch --orphan gh-pages
 git commit --allow-empty -m "init gh-pages"
 git push -u origin gh-pages
-git switch -
+git switch apt-repo
 ```
 
 ## 6. Enable GitHub Pages
