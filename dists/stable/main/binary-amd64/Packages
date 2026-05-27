@@ -14,3 +14,19 @@ Homepage: https://github.com/matthewdtowles/noenvy
 Description: Encrypt .env files with your OS keyring and inject secrets into any command.
 Architecture-Variant: amd64v1
 
+Package: noenvy
+Architecture: amd64
+Version: 0.0.3
+Priority: optional
+Maintainer: Matthew Towles <matthewdtowles@gmail.com>
+Installed-Size: 3860
+Filename: pool/main/n/noenvy/noenvy_0.0.3_linux_amd64.deb
+Size: 1686254
+MD5sum: ea70948cbe3fc8f90870943de840693c
+SHA1: 31b02716ad764cb7ae75f974b6482d77f9620b11
+SHA256: 0107065067c1d73edc6df89ff0be66ae1deb56fbb02cd995fef19efcdd48faeb
+SHA512: e23d55ed480853b1fd34530fa55ea8401fd743e7e7062f6db8e65dd86393424a36b0211d5822dc34061a969b09bd36662331b1aed09801f4f9275ce2b6a6abe4
+Homepage: https://github.com/matthewdtowles/noenvy
+Description: Encrypt .env files with your OS keyring and inject secrets into any command.
+Architecture-Variant: amd64v1
+
