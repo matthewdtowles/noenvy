@@ -68,7 +68,7 @@ To verify the signing key fingerprint before trusting it:
 
 ```bash
 gpg --show-keys /etc/apt/keyrings/noenvy.gpg
-# Expected fingerprint: <set me after running scripts/setup-apt-signing-key.sh>
+# Expected fingerprint: EC78 1698 D374 74DB 88E2  1883 4443 9774 0341 265E
 ```
 
 Future updates: `sudo apt update && sudo apt upgrade noenvy`.
