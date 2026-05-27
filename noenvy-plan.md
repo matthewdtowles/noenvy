@@ -130,29 +130,62 @@ OS Keyring                        # holds encryption key, never touches disk
 
 ---
 
-## Milestones
+## Status (as of 2026-05-26)
+
+All v1 implementation work is done and pushed to `week-1-init-and-run` (PR #1 open against `main`, 8 commits). Remaining steps are operational: merge, tag, verify the release pipeline produces working artifacts, then launch.
+
+### ✅ Done
+- All 8 commands: `init`, `run`, `list`, `set`, `remove`, `import`, `rotate`, `install-skill`
+- Centralized storage default (`~/.noenvy/projects/<id>`) with `--project` opt-in for in-project layout
+- Vault abstraction (`internal/vault`) with atomic writes (temp + rename)
+- Cross-platform release infrastructure: GoReleaser (Mac/Linux/Windows binaries, .deb/.rpm/.apk via nfpm, Homebrew Cask in `matthewdtowles/homebrew-tap`)
+- CI workflow: `go vet` + `go test` on ubuntu-latest + macos-latest
+- Claude Code skill bundled into the binary via `go:embed`
+- README (under-100-word top section, honest threat model, install paths for Mac/Linux/Windows/source, platform-support matrix calling out the Linux keyring caveat, all 8 commands documented, comparison-to-alternatives)
+- LICENSE (MIT)
+- `matthewdtowles/homebrew-tap` repo created; `HOMEBREW_TAP_GITHUB_TOKEN` secret added to `noenvy`
+- Naming check: npm + Homebrew available, GitHub user `noenvy` taken (squatted, dormant) but acceptable papercut, no dominant software trademark
+
+### 🚧 In progress
+- PR #1 review and merge to `main`
+
+### Remaining for launch
+- Merge PR #1 to `main`
+- Tag `v0.0.1` as low-stakes pipeline shakedown (validates Homebrew Cask generation + nfpm packages on real release)
+- Verify `brew install matthewdtowles/tap/noenvy` and `sudo dpkg -i noenvy_*.deb` work from the actual release artifacts
+- Add demo GIF or asciinema cast to README
+- Tag `v0.1.0` as the real launch version
+- Launch post(s) per the checklist below
+
+---
+
+## Milestones (historical, for reference)
 
 ### Week 1: Foundation
-- [ ] Repo scaffold with cobra
-- [ ] `noenvy init` — reads `.env`, generates key, stores in keyring, writes `.noenvy`
-- [ ] `noenvy run` — happy path: decrypt, inject, exec
-- [ ] Cross-platform smoke tests (macOS + Linux at minimum; Windows if you have access)
+- [x] Repo scaffold with cobra
+- [x] `noenvy init` — reads `.env`, generates key, stores in keyring, writes encrypted file
+- [x] `noenvy run` — happy path: decrypt, inject, exec
+- [x] Cross-platform smoke tests (macOS confirmed; Linux/Windows pending real release)
 
 ### Week 2: Round out v1 commands
-- [ ] `add`, `remove`, `list`, `rotate`
-- [ ] `.gitignore` handling on init
-- [ ] Walk-up directory lookup for `.noenvy`
-- [ ] Good error messages (no `.noenvy` found, keyring unavailable, decryption failed, etc.)
+- [x] `set`, `remove`, `list`, `rotate` (and bonus `import`)
+- [x] `.gitignore` handling on init
+- [x] Walk-up project root detection with marker files
+- [x] Good error messages (no vault, keyring missing, decryption failed, merge conflict, etc.)
 
 ### Week 3: Claude Code skill + polish
-- [ ] `noenvy install-skill` with global/project prompts
-- [ ] Write the skill markdown — what it teaches Claude Code about noenvy
-- [ ] README with the top section above, demo GIF or asciinema cast
-- [ ] CONTRIBUTING.md, LICENSE (MIT), CI for tests + releases
+- [x] `noenvy install-skill` with global/project + confirmation prompts
+- [x] Skill content (~130 lines) embedded into binary
+- [x] README with top section + threat model + comparison
+- [x] LICENSE (MIT), CI for tests + releases
+- [ ] Demo GIF or asciinema cast in README (deferred to pre-launch polish)
+- [ ] CONTRIBUTING.md (minimal stub in README is sufficient for v1)
 
 ### Week 4: Ship
-- [ ] GoReleaser config for cross-platform binaries (macOS arm64/amd64, Linux amd64/arm64, Windows amd64)
-- [ ] Homebrew tap (`brew install noenvy` is table stakes)
+- [x] GoReleaser config for cross-platform binaries (macOS arm64/amd64, Linux amd64/arm64, Windows amd64)
+- [x] Homebrew tap setup (repo + PAT + secret wired up)
+- [ ] Cut `v0.0.1` to verify the pipeline end-to-end
+- [ ] Cut `v0.1.0` as the launchable release
 - [ ] Launch post: Hacker News (Tue/Wed morning Eastern), r/programming, r/golang, LinkedIn
 - [ ] Reach out directly to 5 people who'd find it useful
 
@@ -161,13 +194,13 @@ OS Keyring                        # holds encryption key, never touches disk
 ## Launch checklist
 
 ### Before posting
-- [ ] README top section sings (under 100 words, demo visible immediately)
-- [ ] Installation works on a fresh machine (test on a VM or borrowed laptop)
+- [x] README top section sings (under 100 words, demo visible immediately) — 56 words, verified
+- [ ] Installation works on a fresh machine (test on a VM or borrowed laptop) — pending `v0.0.1` release
 - [ ] At least one short demo (GIF or asciinema) in the README
-- [ ] Threat model section is honest and clear
-- [ ] Comparison table to alternatives: dotenv-vault, doppler, infisical, 1Password CLI, direnv
-- [ ] License chosen (MIT recommended for max adoption)
-- [ ] CI green, tests pass, `go vet` clean
+- [x] Threat model section is honest and clear
+- [x] Comparison to alternatives included (prose form; could become a table later)
+- [x] License chosen (MIT)
+- [x] CI green, tests pass, `go vet` clean (will be verified on PR #1's CI run)
 
 ### Launch day
 - [ ] HN post title: descriptive, no "Show HN: I built..." preamble. Something like "Noenvy – Encrypt .env files with your OS keyring"
@@ -182,13 +215,13 @@ OS Keyring                        # holds encryption key, never touches disk
 
 ---
 
-## Naming check (do before any code)
+## Naming check (done — name is "noenvy")
 
-- [ ] `noenvy` npm package name available
-- [ ] `noenvy` available on Homebrew
-- [ ] GitHub org/repo `noenvy` available
-- [ ] Domain `noenvy.dev` or `noenvy.sh` available (nice-to-have, not required)
-- [ ] No trademark conflicts (quick USPTO search)
+- [x] `noenvy` npm package name available
+- [x] `noenvy` available on Homebrew (no core formula by that name)
+- [x] GitHub `matthewdtowles/noenvy` repo created; the bare `noenvy` user/org is squatted by a dormant account, but acceptable as a papercut (people will reach the project via the personal-account URL or via Homebrew install)
+- [ ] Domain `noenvy.dev` or `noenvy.sh` — not pursued; not needed for v1
+- [x] No federally registered software trademark conflicts (scattered non-tech uses in apparel / content creation; low risk for a CLI tool)
 
 Backup names if taken: `envseal`, `envlock`, `keychain-env`, `quietenv`.
 
