@@ -212,7 +212,7 @@ $ noenvy import .env.staging
 Added 4 key(s): AWS_REGION, REDIS_URL, SENTRY_DSN, STRIPE_STAGING_KEY
 ```
 
-By default, errors on the first conflict so you have to pick a strategy:
+By default, refuses to merge if any incoming key already exists in the vault — listing every conflicting key — so you have to pick a strategy:
 
 - `--overwrite` — replace conflicting keys with the new values
 - `--skip-existing` — keep current values, only add the new keys

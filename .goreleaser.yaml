@@ -3,9 +3,10 @@ version: 2
 
 project_name: noenvy
 
-before:
-  hooks:
-    - go mod tidy
+# No `go mod tidy` in the before hook: running it during a release can mutate
+# go.mod / go.sum and produce artifacts that don't match the tagged source.
+# CI runs `go mod tidy` and fails on any diff, so by the time we tag, the
+# dependency tree is already known-clean.
 
 builds:
   - id: noenvy

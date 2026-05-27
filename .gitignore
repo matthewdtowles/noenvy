@@ -10,6 +10,7 @@
 
 # Claude Code per-user settings (project settings.json is fine to commit)
 .claude/settings.local.json
+.claude/pr-review-fix-state.json
 
 # noenvy's own test artifacts (never commit secrets)
 .env

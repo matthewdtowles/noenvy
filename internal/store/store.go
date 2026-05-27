@@ -53,17 +53,27 @@ func InProjectPath(root string) string {
 
 // Locate returns the path to whichever .noenvy file already exists for this
 // project, preferring the in-project layout when both happen to be present.
-// Returns ErrNotFound if neither layout has a file.
+// Returns ErrNotFound if neither layout has a file. Returns a wrapped stat
+// error if a candidate exists but isn't readable (e.g. permission denied),
+// so callers can surface the real cause instead of a misleading "not found".
 func Locate(root, projectID string) (string, error) {
 	inProj := InProjectPath(root)
-	if exists(inProj) {
+	ok, err := exists(inProj)
+	if err != nil {
+		return "", fmt.Errorf("stat %s: %w", inProj, err)
+	}
+	if ok {
 		return inProj, nil
 	}
 	central, err := CentralizedPath(projectID)
 	if err != nil {
 		return "", err
 	}
-	if exists(central) {
+	ok, err = exists(central)
+	if err != nil {
+		return "", fmt.Errorf("stat %s: %w", central, err)
+	}
+	if ok {
 		return central, nil
 	}
 	return "", ErrNotFound
@@ -117,15 +127,17 @@ func quote(v string) string {
 	return v
 }
 
-func exists(path string) bool {
+// exists returns (true, nil) if path exists, (false, nil) if it definitely
+// doesn't, or (false, err) if stat failed for any other reason (permission
+// denied, transient I/O error, etc.) — so callers can distinguish "missing"
+// from "can't tell" and report the actual cause.
+func exists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
-		return true
+		return true, nil
 	}
 	if errors.Is(err, fs.ErrNotExist) {
-		return false
+		return false, nil
 	}
-	// Unknown stat error — treat as non-existent; callers will hit a clearer
-	// error if they try to read it.
-	return false
+	return false, err
 }

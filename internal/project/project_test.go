@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -103,15 +104,16 @@ func TestFindRootFallsBackToStartDir(t *testing.T) {
 	}
 	// Walking up from /tmp/.../bare may eventually find a marker outside the
 	// test sandbox (e.g. on the developer's machine). We only assert that
-	// when it doesn't, fall back is to startDir. So check that got is either
-	// bare itself or an ancestor of it.
+	// when it doesn't, fall back is to startDir or an ancestor of it. A
+	// relative path that starts with ".." means got is below bare or
+	// unrelated to it, which would be wrong.
 	bareResolved, _ := filepath.EvalSymlinks(bare)
 	gotResolved, _ := filepath.EvalSymlinks(got)
 	rel, err := filepath.Rel(gotResolved, bareResolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rel != "." && filepath.IsAbs(rel) {
-		t.Fatalf("FindRoot returned unrelated path %q for start %q", gotResolved, bareResolved)
+	if strings.HasPrefix(rel, "..") {
+		t.Fatalf("FindRoot returned unrelated path %q for start %q (rel %q)", gotResolved, bareResolved, rel)
 	}
 }

@@ -22,7 +22,8 @@ var importCmd = &cobra.Command{
 	Short: "Merge keys from a .env-format file into the existing vault",
 	Long: `Reads <file> in .env format and merges its keys into this project's vault.
 
-By default, errors on the first conflict so you have to pick a strategy:
+By default, refuses to merge if any incoming key already exists in the
+vault — and lists every conflicting key — so you have to pick a strategy:
 
   --overwrite       replace any conflicting keys with the new values
   --skip-existing   keep current values, only add new keys
@@ -79,7 +80,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 	res, err := v.Merge(incoming, strategy)
 	if err != nil {
 		if errors.Is(err, vault.ErrMergeConflict) {
-			// Extract the conflicting key list from the error message for clarity.
+			// Wrap with a guidance line so the user sees the next step inline.
+			// Merge already formatted the conflicting key list into the error.
 			return fmt.Errorf("%w\nPass --overwrite to replace, or --skip-existing to keep current values.", err)
 		}
 		return err
