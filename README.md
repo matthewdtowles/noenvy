@@ -152,6 +152,88 @@ The `--` separator is recommended but optional — `noenvy run npm start` works 
 
 Exit code from the child command is propagated.
 
+### `noenvy list`
+
+Prints the keys currently stored in this project's vault, one per line, sorted.
+
+```bash
+$ noenvy list
+API_KEY
+DATABASE_URL
+SECRET_TOKEN
+```
+
+With `--values` (or `-v`), also prints a **redacted** form of each value (first three and last three characters, with `***` in the middle; values eight characters or shorter are fully masked):
+
+```bash
+$ noenvy list --values
+API_KEY=sk-***c123
+DATABASE_URL=pos***db
+SECRET_TOKEN=***
+```
+
+Full values are intentionally never printed by `list`. If you need to see the raw value of a key, use `noenvy run -- env | grep KEY` — that puts the exposure decision squarely on you.
+
+### `noenvy set <KEY>`
+
+Adds or replaces a single value. If your terminal is interactive, prompts for the value with input hidden:
+
+```bash
+$ noenvy set DATABASE_URL
+Value (hidden): ●●●●●●●●●●●●
+Set DATABASE_URL.
+```
+
+If stdin is piped or redirected, reads the value from stdin (so scripts work):
+
+```bash
+echo 'postgres://localhost/db' | noenvy set DATABASE_URL
+```
+
+If `KEY` already exists, asks for confirmation before overwriting. Pass `--force` (`-f`) to skip the prompt.
+
+### `noenvy remove <KEY>`
+
+Deletes a key from the vault. Aliases: `rm`, `unset`.
+
+```bash
+$ noenvy remove API_KEY
+Removed API_KEY.
+```
+
+Errors if the key doesn't exist. Pass `--force` (`-f`) to silently succeed in that case (useful for idempotent scripts).
+
+### `noenvy import <file>`
+
+Merges keys from a `.env`-format file into this project's vault. Useful when a coworker sends you a credential file you'd rather not leave sitting in plaintext.
+
+```bash
+$ noenvy import .env.staging
+Added 4 key(s): AWS_REGION, REDIS_URL, SENTRY_DSN, STRIPE_STAGING_KEY
+```
+
+By default, errors on the first conflict so you have to pick a strategy:
+
+- `--overwrite` — replace conflicting keys with the new values
+- `--skip-existing` — keep current values, only add the new keys
+
+Optionally, `--remove-source` deletes the source file after a successful import — for the "I don't want this plaintext sitting around" case:
+
+```bash
+$ noenvy import .env.staging --remove-source
+Added 4 key(s): AWS_REGION, REDIS_URL, SENTRY_DSN, STRIPE_STAGING_KEY
+Removed .env.staging.
+```
+
+### `noenvy rotate`
+
+Generates a fresh encryption key, replaces the entry in your OS keyring, and re-encrypts the vault contents with the new key. Use after a suspected key compromise, or as routine hygiene.
+
+```bash
+$ noenvy rotate
+Rotated encryption key for project at /Users/m/Projects/foo.
+```
+
 ## How it works
 
 **File format** (encrypted file, regardless of layout):

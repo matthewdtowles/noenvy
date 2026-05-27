@@ -54,10 +54,11 @@ This is the same threat model as every other local secret tool. Stating it build
 ### Core commands
 - `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted file to `~/.noenvy/projects/<project-id>` (default) or to `.noenvy` in the project (with `--project`), add `.env` to `.gitignore` always; add `.noenvy` to `.gitignore` in `--project` mode
 - `noenvy run -- <command>` — Decrypt in-memory, inject as env vars, exec the command, never write plaintext to disk
-- `noenvy add <KEY>` — Prompt for value, add to encrypted store
-- `noenvy remove <KEY>` — Remove a key from the encrypted store
-- `noenvy list` — Show keys (not values) currently stored
-- `noenvy rotate` — Generate new encryption key, re-encrypt store
+- `noenvy list` — Show keys currently stored (default keys-only; `--values` shows redacted form only — full values are never printed)
+- `noenvy set <KEY>` — Hidden-input prompt (or piped stdin) for value; confirm before overwriting existing key (`--force` to skip)
+- `noenvy remove <KEY>` — Delete a key (`--force` to silently succeed if missing). Aliases: `rm`, `unset`
+- `noenvy import <file>` — Merge keys from a `.env`-format file. Default errors on conflict; `--overwrite` or `--skip-existing` to choose strategy. `--remove-source` deletes the file after success
+- `noenvy rotate` — Generate new encryption key, re-encrypt the vault
 
 ### Claude Code skill bootstrapper
 - `noenvy install-skill` — Creates a skill in `~/.claude/skills/` (global, default) or `./.claude/skills/` (project-local) with confirmation prompt
@@ -206,6 +207,9 @@ These are good ideas. They will tempt you to expand v1. Resist.
 - TUI for managing secrets
 - Editor integration (VS Code extension)
 - Pre-commit hook to detect leaked secrets
+- **Passphrase-based fallback for environments without an OS keyring** (WSL2, headless Linux, Docker containers, devcontainers / Codespaces). Workaround for v1: document that those environments aren't supported and point WSL2 users at installing gnome-keyring. Revisit if real users hit it.
+- Multiple-file selection at run time (e.g. `noenvy run --env staging -- ...` to switch between multiple stored vaults per project) — implied by the multi-environment deferral but worth naming separately.
+- `--project <path>` flag on mutating commands (set / remove / list / import / rotate) to operate on a project other than cwd. Currently `cd` first.
 
 Put these in `ROADMAP.md` after v1 ships and let user demand prioritize them.
 
