@@ -2,7 +2,7 @@
 
 **Stop leaving secrets in .env files.**
 
-Encrypts your `.env` into a `.noenvy` file using a key stored in your OS keyring. Run any command with secrets injected as environment variables. No accounts, no servers, no plaintext on disk.
+Encrypts your `.env` into an encrypted vault using a key stored in your OS keyring. Run any command with secrets injected as environment variables. No accounts, no servers, no plaintext on disk.
 
 ```bash
 noenvy init              # encrypts .env, stores key in keyring

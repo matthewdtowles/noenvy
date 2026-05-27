@@ -12,7 +12,7 @@ var version = "dev"
 var rootCmd = &cobra.Command{
 	Use:   "noenvy",
 	Short: "Encrypt .env files with your OS keyring",
-	Long: `noenvy encrypts your .env file into a .noenvy file using a key
+	Long: `noenvy encrypts your .env file into an encrypted vault using a key
 stored in your OS keyring. Run any command with secrets injected as
 environment variables. No accounts, no servers, no plaintext.`,
 	Version:       version,
