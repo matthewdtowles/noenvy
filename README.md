@@ -234,6 +234,21 @@ $ noenvy rotate
 Rotated encryption key for project at /Users/m/Projects/foo.
 ```
 
+### `noenvy install-skill`
+
+Installs a [Claude Code](https://claude.com/claude-code) skill that teaches Claude when to suggest noenvy, how to wrap commands with it, how to add secrets safely, and what NOT to do.
+
+```bash
+$ noenvy install-skill
+Install noenvy skill at /Users/m/.claude/skills/noenvy/SKILL.md (global — applies to all projects)? [Y/n]: y
+Installed noenvy skill at /Users/m/.claude/skills/noenvy/SKILL.md
+Claude Code will use it in any project.
+```
+
+Default location is global (`~/.claude/skills/noenvy/SKILL.md`) so the skill applies to every project Claude Code sees. Pass `--project` to install it only for the current project. `--force` (`-f`) skips all prompts (useful for scripts).
+
+The skill is small — about 130 lines — and Claude only loads it when something in the user's prompt matches the trigger description (mentions of `.env` files, local secrets, dev commands that need env vars, etc.).
+
 ## How it works
 
 **File format** (encrypted file, regardless of layout):

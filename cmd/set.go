@@ -55,7 +55,7 @@ func runSet(cmd *cobra.Command, args []string) error {
 
 	existed := v.Has(key)
 	if existed && !setForce {
-		ok, err := confirm(cmd, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", key))
+		ok, err := confirm(cmd, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", key), false)
 		if err != nil {
 			return err
 		}
@@ -112,12 +112,12 @@ func readSecretValue(cmd *cobra.Command) (string, error) {
 }
 
 // confirm prompts the user (via stderr) for a yes/no answer. Returns true
-// only on an explicit "y" or "yes" (case-insensitive). Anything else,
-// including empty input, is "no".
-func confirm(cmd *cobra.Command, prompt string) (bool, error) {
+// on an explicit "y" or "yes", false on "n" or "no". For empty input, the
+// defaultYes argument decides — pass true for [Y/n]-style prompts and false
+// for [y/N]-style. In non-interactive mode it errors instead of guessing.
+func confirm(cmd *cobra.Command, prompt string, defaultYes bool) (bool, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		// No way to confirm interactively; refuse rather than guess.
-		return false, errors.New("refusing to overwrite without --force in non-interactive mode")
+		return false, errors.New("refusing to prompt for confirmation in non-interactive mode (pass --force)")
 	}
 	fmt.Fprint(cmd.ErrOrStderr(), prompt)
 	reader := bufio.NewReader(os.Stdin)
@@ -126,6 +126,9 @@ func confirm(cmd *cobra.Command, prompt string) (bool, error) {
 		return false, err
 	}
 	ans := strings.ToLower(strings.TrimSpace(line))
+	if ans == "" {
+		return defaultYes, nil
+	}
 	return ans == "y" || ans == "yes", nil
 }
 

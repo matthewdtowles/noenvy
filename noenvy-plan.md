@@ -61,9 +61,9 @@ This is the same threat model as every other local secret tool. Stating it build
 - `noenvy rotate` — Generate new encryption key, re-encrypt the vault
 
 ### Claude Code skill bootstrapper
-- `noenvy install-skill` — Creates a skill in `~/.claude/skills/` (global, default) or `./.claude/skills/` (project-local) with confirmation prompt
-- Skill teaches Claude Code how to use noenvy: when to suggest it, how to run commands with it, how to add secrets safely
-- Default is global with prompt to confirm; flag to force project-local: `--project`
+- `noenvy install-skill` — Creates a skill in `~/.claude/skills/noenvy/SKILL.md` (global, default) or `./.claude/skills/noenvy/SKILL.md` (project-local). Global install confirms the location once before writing; `--project` writes immediately. `--force` skips all prompts including overwrite confirms.
+- Skill teaches Claude Code: when to suggest noenvy, how to wrap commands with `noenvy run --`, how to add secrets safely (interactive set, no echo), how to bulk import, what NOT to do (cat the file, echo values, recommend committing), how to detect setup, and how to interpret common errors.
+- Content lives at `internal/skill/SKILL.md` and is embedded into the binary via `go:embed`, so the installed binary doesn't need any companion files.
 
 ### What v1 does NOT do (write these down so you don't drift)
 - ❌ Sync across machines (different product)
