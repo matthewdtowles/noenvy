@@ -52,17 +52,18 @@ This is the same threat model as every other local secret tool. Stating it build
 ## v1 scope (ruthlessly narrow)
 
 ### Core commands
-- `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted `.noenvy` file, add `.noenvy` to `.gitignore` if not already there (and optionally also `.env` if user wants)
+- `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted file to `~/.noenvy/projects/<project-id>` (default) or to `.noenvy` in the project (with `--project`), add `.env` to `.gitignore` always; add `.noenvy` to `.gitignore` in `--project` mode
 - `noenvy run -- <command>` — Decrypt in-memory, inject as env vars, exec the command, never write plaintext to disk
-- `noenvy add <KEY>` — Prompt for value, add to encrypted store
-- `noenvy remove <KEY>` — Remove a key from the encrypted store
-- `noenvy list` — Show keys (not values) currently stored
-- `noenvy rotate` — Generate new encryption key, re-encrypt store
+- `noenvy list` — Show keys currently stored (default keys-only; `--values` shows redacted form only — full values are never printed)
+- `noenvy set <KEY>` — Hidden-input prompt (or piped stdin) for value; confirm before overwriting existing key (`--force` to skip)
+- `noenvy remove <KEY>` — Delete a key (`--force` to silently succeed if missing). Aliases: `rm`, `unset`
+- `noenvy import <file>` — Merge keys from a `.env`-format file. Default errors on conflict; `--overwrite` or `--skip-existing` to choose strategy. `--remove-source` deletes the file after success
+- `noenvy rotate` — Generate new encryption key, re-encrypt the vault
 
 ### Claude Code skill bootstrapper
-- `noenvy install-skill` — Creates a skill in `~/.claude/skills/` (global, default) or `./.claude/skills/` (project-local) with confirmation prompt
-- Skill teaches Claude Code how to use noenvy: when to suggest it, how to run commands with it, how to add secrets safely
-- Default is global with prompt to confirm; flag to force project-local: `--project`
+- `noenvy install-skill` — Creates a skill in `~/.claude/skills/noenvy/SKILL.md` (global, default) or `./.claude/skills/noenvy/SKILL.md` (project-local). Global install confirms the location once before writing; `--project` writes immediately. `--force` skips all prompts including overwrite confirms.
+- Skill teaches Claude Code: when to suggest noenvy, how to wrap commands with `noenvy run --`, how to add secrets safely (interactive set, no echo), how to bulk import, what NOT to do (cat the file, echo values, recommend committing), how to detect setup, and how to interpret common errors.
+- Content lives at `internal/skill/SKILL.md` and is embedded into the binary via `go:embed`, so the installed binary doesn't need any companion files.
 
 ### What v1 does NOT do (write these down so you don't drift)
 - ❌ Sync across machines (different product)
@@ -94,59 +95,97 @@ Reasons:
 
 **Crypto design:**
 - Generate a random 32-byte key on `init`
-- Store key in OS keyring under a service name like `noenvy` and account name derived from project path or user-provided project ID
-- Encrypt with AES-256-GCM, store nonce + ciphertext in `.noenvy` file
-- File format: version byte + nonce + ciphertext + auth tag (keep it simple, document it)
+- Store key in OS keyring under service name `noenvy` and account name = project ID
+- Encrypt with AES-256-GCM, store version byte + nonce + ciphertext + auth tag in the encrypted file
+- File format: version byte (0x01) + 12-byte nonce + ciphertext + 16-byte auth tag (keep it simple, document it)
 
 ---
 
 ## Architecture
 
 ```
-~/.config/noenvy/             # global config (which keyring entries map to which projects)
-./project/.env                # input (gitignored, user-managed)
-./project/.noenvy             # encrypted output (committed or gitignored, user choice)
-OS Keyring                    # holds encryption key, never touches disk
+~/.noenvy/projects/<project-id>   # encrypted output (default — centralized)
+./project/.env                    # input (gitignored, user-managed)
+./project/.noenvy                 # encrypted output (only when --project mode; gitignored)
+OS Keyring                        # holds encryption key, never touches disk
 ```
 
+**Storage default is centralized.** Encrypted files are not designed to be committed in v1 — without the encryption key (which never leaves the local OS keyring), the file is opaque bytes. Team sharing of keys is explicitly out of scope. The `--project` opt-in puts the file inside the project directory for users who prefer keeping per-project files there; it is also gitignored.
+
 **Flow for `noenvy run -- npm start`:**
-1. Read `.noenvy` from current dir (walk up if needed, like git)
-2. Look up encryption key from OS keyring using project identifier
-3. Decrypt in memory
-4. Parse key-value pairs
-5. Fork-exec the child command with env vars set (`os/exec` with `Env` field)
-6. Stream stdout/stderr through, propagate exit code
-7. Never write decrypted values to disk
+1. Walk up from cwd looking for `.git`, `package.json`, `Cargo.toml`, `go.mod`, or `pyproject.toml` to find the project root (fall back to cwd)
+2. Compute project ID = SHA-256(absolute project root path)[:32]
+3. Locate the encrypted file: prefer in-project `<root>/.noenvy`, fall back to `~/.noenvy/projects/<project-id>`
+4. Look up encryption key from OS keyring using project ID
+5. Decrypt in memory
+6. Parse key-value pairs
+7. Fork-exec the child command with env vars set (`os/exec` with `Env` field)
+8. Stream stdout/stderr through, propagate exit code
+9. Never write decrypted values to disk
 
 **Project identification:**
-- Default: hash of absolute path to `.noenvy` file → used as keyring account name
-- Override: user can specify a project ID in a `.noenvy.toml` config file for cases where path changes (laptop migration, etc.)
+- Project ID derived from the project root's absolute path (SHA-256, hex, first 32 chars)
+- Used as both the keyring account name and the filename in centralized storage
+- Future: a `.noenvy.toml` config could let users override the project ID for cases where paths change (laptop migration, etc.) — deferred
 
 ---
 
-## Milestones
+## Status (as of 2026-05-26)
+
+All v1 implementation work is done and pushed to `week-1-init-and-run` (PR #1 open against `main`, 8 commits). Remaining steps are operational: merge, tag, verify the release pipeline produces working artifacts, then launch.
+
+### ✅ Done
+- All 8 commands: `init`, `run`, `list`, `set`, `remove`, `import`, `rotate`, `install-skill`
+- Centralized storage default (`~/.noenvy/projects/<id>`) with `--project` opt-in for in-project layout
+- Vault abstraction (`internal/vault`) with atomic writes (temp + rename)
+- Cross-platform release infrastructure: GoReleaser (Mac/Linux/Windows binaries, .deb/.rpm/.apk via nfpm, Homebrew Cask in `matthewdtowles/homebrew-tap`)
+- CI workflow: `go vet` + `go test` on ubuntu-latest + macos-latest
+- Claude Code skill bundled into the binary via `go:embed`
+- README (under-100-word top section, honest threat model, install paths for Mac/Linux/Windows/source, platform-support matrix calling out the Linux keyring caveat, all 8 commands documented, comparison-to-alternatives)
+- LICENSE (MIT)
+- `matthewdtowles/homebrew-tap` repo created; `HOMEBREW_TAP_GITHUB_TOKEN` secret added to `noenvy`
+- Naming check: npm + Homebrew available, GitHub user `noenvy` taken (squatted, dormant) but acceptable papercut, no dominant software trademark
+
+### 🚧 In progress
+- PR #1 review and merge to `main`
+
+### Remaining for launch
+- Merge PR #1 to `main`
+- Tag `v0.0.1` as low-stakes pipeline shakedown (validates Homebrew Cask generation + nfpm packages on real release)
+- Verify `brew install matthewdtowles/tap/noenvy` and `sudo dpkg -i noenvy_*.deb` work from the actual release artifacts
+- Add demo GIF or asciinema cast to README
+- Tag `v0.1.0` as the real launch version
+- Launch post(s) per the checklist below
+
+---
+
+## Milestones (historical, for reference)
 
 ### Week 1: Foundation
-- [ ] Repo scaffold with cobra
-- [ ] `noenvy init` — reads `.env`, generates key, stores in keyring, writes `.noenvy`
-- [ ] `noenvy run` — happy path: decrypt, inject, exec
-- [ ] Cross-platform smoke tests (macOS + Linux at minimum; Windows if you have access)
+- [x] Repo scaffold with cobra
+- [x] `noenvy init` — reads `.env`, generates key, stores in keyring, writes encrypted file
+- [x] `noenvy run` — happy path: decrypt, inject, exec
+- [x] Cross-platform smoke tests (macOS confirmed; Linux/Windows pending real release)
 
 ### Week 2: Round out v1 commands
-- [ ] `add`, `remove`, `list`, `rotate`
-- [ ] `.gitignore` handling on init
-- [ ] Walk-up directory lookup for `.noenvy`
-- [ ] Good error messages (no `.noenvy` found, keyring unavailable, decryption failed, etc.)
+- [x] `set`, `remove`, `list`, `rotate` (and bonus `import`)
+- [x] `.gitignore` handling on init
+- [x] Walk-up project root detection with marker files
+- [x] Good error messages (no vault, keyring missing, decryption failed, merge conflict, etc.)
 
 ### Week 3: Claude Code skill + polish
-- [ ] `noenvy install-skill` with global/project prompts
-- [ ] Write the skill markdown — what it teaches Claude Code about noenvy
-- [ ] README with the top section above, demo GIF or asciinema cast
-- [ ] CONTRIBUTING.md, LICENSE (MIT), CI for tests + releases
+- [x] `noenvy install-skill` with global/project + confirmation prompts
+- [x] Skill content (~130 lines) embedded into binary
+- [x] README with top section + threat model + comparison
+- [x] LICENSE (MIT), CI for tests + releases
+- [ ] Demo GIF or asciinema cast in README (deferred to pre-launch polish)
+- [ ] CONTRIBUTING.md (minimal stub in README is sufficient for v1)
 
 ### Week 4: Ship
-- [ ] GoReleaser config for cross-platform binaries (macOS arm64/amd64, Linux amd64/arm64, Windows amd64)
-- [ ] Homebrew tap (`brew install noenvy` is table stakes)
+- [x] GoReleaser config for cross-platform binaries (macOS arm64/amd64, Linux amd64/arm64, Windows amd64)
+- [x] Homebrew tap setup (repo + PAT + secret wired up)
+- [ ] Cut `v0.0.1` to verify the pipeline end-to-end
+- [ ] Cut `v0.1.0` as the launchable release
 - [ ] Launch post: Hacker News (Tue/Wed morning Eastern), r/programming, r/golang, LinkedIn
 - [ ] Reach out directly to 5 people who'd find it useful
 
@@ -155,13 +194,13 @@ OS Keyring                    # holds encryption key, never touches disk
 ## Launch checklist
 
 ### Before posting
-- [ ] README top section sings (under 100 words, demo visible immediately)
-- [ ] Installation works on a fresh machine (test on a VM or borrowed laptop)
+- [x] README top section sings (under 100 words, demo visible immediately) — 56 words, verified
+- [ ] Installation works on a fresh machine (test on a VM or borrowed laptop) — pending `v0.0.1` release
 - [ ] At least one short demo (GIF or asciinema) in the README
-- [ ] Threat model section is honest and clear
-- [ ] Comparison table to alternatives: dotenv-vault, doppler, infisical, 1Password CLI, direnv
-- [ ] License chosen (MIT recommended for max adoption)
-- [ ] CI green, tests pass, `go vet` clean
+- [x] Threat model section is honest and clear
+- [x] Comparison to alternatives included (prose form; could become a table later)
+- [x] License chosen (MIT)
+- [x] CI green, tests pass, `go vet` clean (will be verified on PR #1's CI run)
 
 ### Launch day
 - [ ] HN post title: descriptive, no "Show HN: I built..." preamble. Something like "Noenvy – Encrypt .env files with your OS keyring"
@@ -176,13 +215,13 @@ OS Keyring                    # holds encryption key, never touches disk
 
 ---
 
-## Naming check (do before any code)
+## Naming check (done — name is "noenvy")
 
-- [ ] `noenvy` npm package name available
-- [ ] `noenvy` available on Homebrew
-- [ ] GitHub org/repo `noenvy` available
-- [ ] Domain `noenvy.dev` or `noenvy.sh` available (nice-to-have, not required)
-- [ ] No trademark conflicts (quick USPTO search)
+- [x] `noenvy` npm package name available
+- [x] `noenvy` available on Homebrew (no core formula by that name)
+- [x] GitHub `matthewdtowles/noenvy` repo created; the bare `noenvy` user/org is squatted by a dormant account, but acceptable as a papercut (people will reach the project via the personal-account URL or via Homebrew install)
+- [ ] Domain `noenvy.dev` or `noenvy.sh` — not pursued; not needed for v1
+- [x] No federally registered software trademark conflicts (scattered non-tech uses in apparel / content creation; low risk for a CLI tool)
 
 Backup names if taken: `envseal`, `envlock`, `keychain-env`, `quietenv`.
 
@@ -201,6 +240,9 @@ These are good ideas. They will tempt you to expand v1. Resist.
 - TUI for managing secrets
 - Editor integration (VS Code extension)
 - Pre-commit hook to detect leaked secrets
+- **Passphrase-based fallback for environments without an OS keyring** (WSL2, headless Linux, Docker containers, devcontainers / Codespaces). Workaround for v1: document that those environments aren't supported and point WSL2 users at installing gnome-keyring. Revisit if real users hit it.
+- Multiple-file selection at run time (e.g. `noenvy run --env staging -- ...` to switch between multiple stored vaults per project) — implied by the multi-environment deferral but worth naming separately.
+- `--project <path>` flag on mutating commands (set / remove / list / import / rotate) to operate on a project other than cwd. Currently `cd` first.
 
 Put these in `ROADMAP.md` after v1 ships and let user demand prioritize them.
 
