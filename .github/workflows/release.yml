@@ -29,5 +29,10 @@ jobs:
           version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RELEASE_PAT (fine-scoped PAT with contents:write) instead of the
+          # built-in GITHUB_TOKEN. Actions triggered by GITHUB_TOKEN do not
+          # fire other workflows, so a release published via GITHUB_TOKEN
+          # would not trigger apt-repo.yml. A PAT belongs to a user, so the
+          # release:published event propagates and downstream workflows run.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
