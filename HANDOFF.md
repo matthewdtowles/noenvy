@@ -71,23 +71,25 @@ GitHub → repo Settings → Pages
 
 Wait for the first deploy to go green.
 
-## 7. Publish the apt repo for the existing v0.0.1 release
+## 7. Merge this PR to main
 
-The workflow auto-runs on every future tagged release. To backfill v0.0.1:
+`gh workflow run` (and the GitHub Actions UI's "Run workflow" button) only see workflow files that exist on the **default branch**. The workflow can't be triggered from `apt-repo` even with `--ref` — it has to land on `main` first. After CI passes (the fingerprint check from step 4 unblocks it), merge PR #2.
+
+## 8. Publish the apt repo for the existing v0.0.1 release
+
+After merge, switch back to a clean checkout of main and backfill v0.0.1:
 
 ```bash
+git switch main && git pull
 gh workflow run apt-repo.yml -f tag=v0.0.1
-```
-
-Watch it with:
-
-```bash
 gh run watch
 ```
 
 When it finishes, `https://matthewdtowles.github.io/noenvy/key.gpg` and `https://matthewdtowles.github.io/noenvy/dists/stable/Release` should both load.
 
-## 8. Smoke-test the install path
+Future tagged releases auto-publish via the `release: published` trigger — no manual dispatch needed.
+
+## 9. Smoke-test the install path
 
 On a fresh Ubuntu VM (or this machine):
 
@@ -102,11 +104,7 @@ sudo apt install noenvy
 noenvy --version
 ```
 
-If `apt update` complains about a missing/invalid signature, re-check that `GPG_FINGERPRINT` matches the key actually loaded into the workflow.
-
-## 9. Merge this branch
-
-Once steps 1–8 work, merge to `main`. The next tagged release will publish through the apt repo automatically.
+If `apt update` complains about a missing/invalid signature, re-check that `GPG_FINGERPRINT` matches the key actually loaded into the workflow. If something else goes wrong, fix forward with new commits to `main`.
 
 ## Key rotation (future)
 
