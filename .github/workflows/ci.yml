@@ -31,3 +31,15 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      # Catch the fingerprint placeholder in README before it reaches main:
+      # the apt install instructions tell users to verify the signing key
+      # against a known fingerprint, so the placeholder must be substituted
+      # for a real value before publishing.
+      - name: README fingerprint placeholder check
+        if: runner.os == 'Linux'
+        run: |
+          if grep -F '<set me after running' README.md; then
+            echo "::error::README.md still contains the fingerprint placeholder. Substitute the real signing-key fingerprint (see HANDOFF.md step 4) before merging."
+            exit 1
+          fi

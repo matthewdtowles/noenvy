@@ -39,7 +39,12 @@ if [ -z "$PASSPHRASE" ]; then
 fi
 
 BATCH_FILE="$(mktemp)"
-trap 'rm -f "$BATCH_FILE"' EXIT
+GNUPGHOME="$(mktemp -d)"
+export GNUPGHOME
+# Combined trap up front so the passphrase-bearing BATCH_FILE is always cleaned
+# up no matter where the script exits, including future edits that add work
+# between resource creation and key generation.
+trap 'rm -rf "$GNUPGHOME"; rm -f "$BATCH_FILE"' EXIT
 
 cat >"$BATCH_FILE" <<EOF
 %echo Generating signing key (this can take a minute)
@@ -53,10 +58,6 @@ Passphrase: $PASSPHRASE
 %commit
 %echo Done
 EOF
-
-GNUPGHOME="$(mktemp -d)"
-export GNUPGHOME
-trap 'rm -rf "$GNUPGHOME"; rm -f "$BATCH_FILE"' EXIT
 
 gpg --batch --generate-key "$BATCH_FILE"
 

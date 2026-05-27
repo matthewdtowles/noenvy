@@ -34,22 +34,34 @@ jobs:
             echo "tag=${{ github.event.inputs.tag }}" >>"$GITHUB_OUTPUT"
           fi
 
+      # Probe explicitly: distinguishes "branch doesn't exist yet" (legitimate
+      # first-publish case) from "checkout failed" (transient error we must
+      # surface — silently re-initialising would orphan existing history and
+      # the eventual push would be rejected as non-fast-forward).
+      - name: Check if gh-pages branch exists
+        id: ghpages
+        run: |
+          if git ls-remote --exit-code --heads \
+              "https://github.com/${{ github.repository }}.git" gh-pages >/dev/null 2>&1; then
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout gh-pages branch
+        if: steps.ghpages.outputs.exists == 'true'
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           path: pages
-        continue-on-error: true
 
       - name: Initialise gh-pages if it doesn't exist
+        if: steps.ghpages.outputs.exists == 'false'
         run: |
-          if [ ! -d pages/.git ]; then
-            rm -rf pages
-            git init pages
-            cd pages
-            git checkout -b gh-pages
-            git remote add origin "https://github.com/${{ github.repository }}.git"
-          fi
+          git init pages
+          cd pages
+          git checkout -b gh-pages
+          git remote add origin "https://github.com/${{ github.repository }}.git"
 
       - name: Install apt repo tooling
         run: |
@@ -65,6 +77,14 @@ jobs:
             --repo "${{ github.repository }}" \
             --pattern '*.deb' \
             --dir incoming
+          # Fail fast with a clear message rather than letting the next step
+          # die on `cp incoming/*.deb …` with a confusing literal-glob error.
+          count=$(find incoming -maxdepth 1 -name '*.deb' -type f | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Release ${{ steps.tag.outputs.tag }} has no .deb assets to publish."
+            exit 1
+          fi
+          echo "Found $count .deb file(s)."
           ls -la incoming
 
       - name: Place .debs into pool
