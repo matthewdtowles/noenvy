@@ -70,7 +70,7 @@ If the user has a `.env`-format file with new secrets (often a coworker shared o
 noenvy import .env.staging
 ```
 
-By default this errors on the first conflict. The user picks a strategy:
+By default this refuses to merge if any incoming key already exists in the vault, listing every conflict at once. The user picks a strategy:
 
 - `--overwrite` — replace existing values with the new ones
 - `--skip-existing` — keep existing values, only add new keys

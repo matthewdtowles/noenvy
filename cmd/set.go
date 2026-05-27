@@ -99,12 +99,13 @@ func readSecretValue(cmd *cobra.Command) (string, error) {
 		}
 		return val, nil
 	}
-	// Non-TTY: read entire stdin, strip the single trailing newline if any.
+	// Non-TTY: read entire stdin, strip the trailing newline if any.
+	// Trim "\r\n" to handle CRLF from Windows pipes, not just LF.
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return "", fmt.Errorf("read stdin: %w", err)
 	}
-	val := strings.TrimRight(string(data), "\n")
+	val := strings.TrimRight(string(data), "\r\n")
 	if val == "" {
 		return "", errors.New("empty value on stdin")
 	}
