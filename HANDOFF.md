@@ -19,14 +19,14 @@ To make the above actually work, run through the steps below once.
 ./scripts/setup-apt-signing-key.sh
 ```
 
-Pick a strong passphrase and store it somewhere durable (1Password / your password manager). You'll need it again if you ever rotate the key or manually re-run the publishing workflow. The script writes `private.asc`, `public.asc`, and prints the key fingerprint. Output lives in `.apt-signing-key/` (gitignored).
+Pick a strong passphrase and store it somewhere durable (1Password / your password manager). You'll need it again if you ever rotate the key or manually re-run the publishing workflow. The script writes `private.asc`, `public.asc`, and prints the key fingerprint. Output lives at `~/.local/share/noenvy-apt-signing-key/` (outside the repo, so it can't be backed up, indexed, or accidentally committed).
 
 ## 2. Add GitHub Actions secrets
 
 The script prints these commands with the right paths. Run them in the repo root:
 
 ```bash
-gh secret set GPG_PRIVATE_KEY < .apt-signing-key/private.asc
+gh secret set GPG_PRIVATE_KEY < ~/.local/share/noenvy-apt-signing-key/private.asc
 gh secret set GPG_PASSPHRASE         # paste the passphrase when prompted
 echo <FINGERPRINT> | gh secret set GPG_FINGERPRINT
 ```
@@ -36,7 +36,7 @@ Verify with `gh secret list` — you should see all three.
 ## 3. Delete the local key material
 
 ```bash
-rm -rf .apt-signing-key
+rm -rf ~/.local/share/noenvy-apt-signing-key
 ```
 
 The private key now lives only in GitHub Actions secrets. The public key will be republished to `gh-pages` on every release.
@@ -112,7 +112,7 @@ Once steps 1–8 work, merge to `main`. The next tagged release will publish thr
 
 To rotate the signing key:
 
-1. Re-run `./scripts/setup-apt-signing-key.sh` (delete `.apt-signing-key/` first).
+1. Re-run `./scripts/setup-apt-signing-key.sh` (delete `~/.local/share/noenvy-apt-signing-key/` first).
 2. Update all three GitHub secrets with the new values.
 3. Update the fingerprint in `README.md`.
 4. Re-run the apt-repo workflow against any tag so the new public key is published.

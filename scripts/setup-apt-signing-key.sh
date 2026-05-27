@@ -13,7 +13,10 @@ set -euo pipefail
 
 KEY_NAME="noenvy apt repo signing key"
 KEY_EMAIL="matthewdtowles+noenvy-apt@gmail.com"
-OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/.apt-signing-key"
+# Write outside the repo so the private key isn't sitting inside a directory
+# that may be backed up, indexed, or accidentally committed. XDG default with
+# a sensible fallback.
+OUT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/noenvy-apt-signing-key"
 
 if ! command -v gpg >/dev/null 2>&1; then
   echo "error: gpg is not installed" >&2
