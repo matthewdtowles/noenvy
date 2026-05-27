@@ -73,10 +73,8 @@ changelog:
       - "^chore:"
       - "^ci:"
 
-homebrew_casks:
+brews:
   - name: noenvy
-    binaries:
-      - noenvy
     repository:
       owner: matthewdtowles
       name: homebrew-tap
@@ -86,3 +84,7 @@ homebrew_casks:
     description: "Encrypt .env files with your OS keyring and inject secrets into any command."
     license: "MIT"
     commit_msg_template: "noenvy {{ .Tag }}"
+    install: |
+      bin.install "noenvy"
+    test: |
+      system "#{bin}/noenvy", "-v"
