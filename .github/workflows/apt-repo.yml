@@ -1,0 +1,192 @@
+name: apt-repo
+
+# Publishes signed Debian/apt repository metadata to the gh-pages branch
+# after a GitHub release is published. GoReleaser uploads the .deb files
+# to the release; this workflow pulls them into a proper apt repo so users
+# can `apt install noenvy` instead of downloading .debs manually.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.0.1)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apt-repo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >>"$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >>"$GITHUB_OUTPUT"
+          fi
+
+      # Probe explicitly: distinguishes "branch doesn't exist yet" (legitimate
+      # first-publish case) from "checkout failed" (transient error we must
+      # surface — silently re-initialising would orphan existing history and
+      # the eventual push would be rejected as non-fast-forward).
+      - name: Check if gh-pages branch exists
+        id: ghpages
+        run: |
+          if git ls-remote --exit-code --heads \
+              "https://github.com/${{ github.repository }}.git" gh-pages >/dev/null 2>&1; then
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout gh-pages branch
+        if: steps.ghpages.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+
+      - name: Initialise gh-pages if it doesn't exist
+        if: steps.ghpages.outputs.exists == 'false'
+        run: |
+          git init pages
+          cd pages
+          git checkout -b gh-pages
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+
+      - name: Install apt repo tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils gnupg
+
+      - name: Download .deb assets from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p incoming
+          gh release download "${{ steps.tag.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*.deb' \
+            --dir incoming
+          # Fail fast with a clear message rather than letting the next step
+          # die on `cp incoming/*.deb …` with a confusing literal-glob error.
+          count=$(find incoming -maxdepth 1 -name '*.deb' -type f | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Release ${{ steps.tag.outputs.tag }} has no .deb assets to publish."
+            exit 1
+          fi
+          echo "Found $count .deb file(s)."
+          ls -la incoming
+
+      - name: Place .debs into pool
+        run: |
+          mkdir -p pages/pool/main/n/noenvy
+          cp incoming/*.deb pages/pool/main/n/noenvy/
+
+      - name: Import signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ] || [ -z "$GPG_PASSPHRASE" ] || [ -z "$GPG_FINGERPRINT" ]; then
+            echo "::error::GPG_PRIVATE_KEY, GPG_PASSPHRASE, and GPG_FINGERPRINT secrets must be set."
+            echo "Run scripts/setup-apt-signing-key.sh locally to generate them."
+            exit 1
+          fi
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "use-agent" >~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >>~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          # Export the public key (armored) into the published repo
+          gpg --armor --export "$GPG_FINGERPRINT" >pages/key.gpg
+
+      - name: Build apt repo metadata
+        working-directory: pages
+        run: |
+          set -euo pipefail
+          mkdir -p dists/stable/main/binary-amd64 dists/stable/main/binary-arm64
+
+          # Generate Packages files for each arch
+          for arch in amd64 arm64; do
+            apt-ftparchive --arch "$arch" packages pool/ \
+              >"dists/stable/main/binary-$arch/Packages"
+            gzip -kf "dists/stable/main/binary-$arch/Packages"
+          done
+
+          # Generate top-level Release file (lists all components/architectures
+          # and hashes the per-arch Packages files)
+          cat >dists/stable/aptftp.conf <<'EOF'
+          APT::FTPArchive::Release {
+            Origin "noenvy";
+            Label "noenvy";
+            Suite "stable";
+            Codename "stable";
+            Architectures "amd64 arm64";
+            Components "main";
+            Description "noenvy apt repository";
+          };
+          EOF
+          apt-ftparchive -c dists/stable/aptftp.conf release dists/stable \
+            >dists/stable/Release
+          rm dists/stable/aptftp.conf
+
+      - name: Sign Release
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+        working-directory: pages
+        run: |
+          # Detached signature (Release.gpg) and clearsigned (InRelease).
+          # Modern apt prefers InRelease; older clients fall back to Release+Release.gpg.
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --default-key "$GPG_FINGERPRINT" \
+              -abs -o dists/stable/Release.gpg dists/stable/Release
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --default-key "$GPG_FINGERPRINT" \
+              --clearsign -o dists/stable/InRelease dists/stable/Release
+
+      - name: Write index page
+        working-directory: pages
+        run: |
+          cat >index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>noenvy apt repository</title>
+          <h1>noenvy apt repository</h1>
+          <p>See <a href="https://github.com/matthewdtowles/noenvy#install">the README</a>
+          for install instructions.</p>
+          <ul>
+            <li><a href="key.gpg">key.gpg</a> — public signing key</li>
+            <li><a href="dists/stable/Release">dists/stable/Release</a></li>
+          </ul>
+          EOF
+
+      - name: Commit and push
+        working-directory: pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+            exit 0
+          fi
+          git commit -m "apt-repo: publish ${{ steps.tag.outputs.tag }}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" gh-pages

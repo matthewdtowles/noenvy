@@ -50,14 +50,34 @@ If your local machine is compromised, noenvy won't save you. Neither will any ot
 brew install matthewdtowles/tap/noenvy
 ```
 
-### Linux — `.deb` / `.rpm` / `.apk`
+### Linux — Debian / Ubuntu / Mint / Pop!_OS / Kali (apt)
 
-Download the package for your distro from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest) and install:
+One-time repo setup, then `apt install` from there on out. Every package is GPG-signature-verified end-to-end by apt:
 
 ```bash
-# Debian / Ubuntu / Mint / Pop!_OS / Kali
-sudo dpkg -i noenvy_*_linux_amd64.deb
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://matthewdtowles.github.io/noenvy/key.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/noenvy.gpg
+echo "deb [signed-by=/etc/apt/keyrings/noenvy.gpg] https://matthewdtowles.github.io/noenvy stable main" \
+  | sudo tee /etc/apt/sources.list.d/noenvy.list
+sudo apt update
+sudo apt install noenvy
+```
 
+To verify the signing key fingerprint before trusting it:
+
+```bash
+gpg --show-keys /etc/apt/keyrings/noenvy.gpg
+# Expected fingerprint: EC78 1698 D374 74DB 88E2  1883 4443 9774 0341 265E
+```
+
+Future updates: `sudo apt update && sudo apt upgrade noenvy`.
+
+### Linux — Fedora / RHEL / CentOS / Rocky (.rpm) and Alpine (.apk)
+
+Grab the package for your distro from the [latest release](https://github.com/matthewdtowles/noenvy/releases/latest) and install:
+
+```bash
 # Fedora / RHEL / CentOS / Rocky
 sudo rpm -i noenvy_*_linux_amd64.rpm
 
@@ -65,7 +85,7 @@ sudo rpm -i noenvy_*_linux_amd64.rpm
 sudo apk add --allow-untrusted noenvy_*_linux_amd64.apk
 ```
 
-Replace `amd64` with `arm64` if you're on ARM.
+Replace `amd64` with `arm64` if you're on ARM. A signed dnf/yum repo is on the roadmap.
 
 ### Windows — direct download
 
