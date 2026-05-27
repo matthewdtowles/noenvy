@@ -1,0 +1,15 @@
+Package: noenvy
+Architecture: arm64
+Version: 0.0.2
+Priority: optional
+Maintainer: Matthew Towles <matthewdtowles@gmail.com>
+Installed-Size: 3712
+Filename: pool/main/n/noenvy/noenvy_0.0.2_linux_arm64.deb
+Size: 1539490
+MD5sum: 908cb0dbf864bc3d17bfbd7a686551fa
+SHA1: 5a4c8684f7f9b3d901dab25271c82c051f9efeea
+SHA256: 98569392c524ed268e9e1d5037b8b18a0911c9c2593cdec376a94a1fee02d9bc
+SHA512: dd9fbae4b9aa33463b9539dc40b06d49752d35b23ac3dd7cd8d4b366520829b3803eb9ad01438a5b1bb8314186f1fef16898223e657b35f65930afbba942dbf5
+Homepage: https://github.com/matthewdtowles/noenvy
+Description: Encrypt .env files with your OS keyring and inject secrets into any command.
+
