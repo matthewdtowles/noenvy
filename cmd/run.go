@@ -21,7 +21,12 @@ environment.
 Use -- to separate noenvy's flags from the command:
 
   noenvy run -- npm start
-  noenvy run -- env | grep API_KEY`,
+  noenvy run -- env | grep API_KEY
+
+run is the default command, so the "run --" prefix can be dropped as long
+as the command isn't named like a noenvy subcommand:
+
+  noenvy npm start`,
 	Args:               cobra.MinimumNArgs(1),
 	DisableFlagParsing: true,
 	RunE:               runRun,

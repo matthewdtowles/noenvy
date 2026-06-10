@@ -5,8 +5,8 @@
 Encrypts your `.env` into an encrypted vault using a key stored in your OS keyring. Run any command with secrets injected as environment variables. No accounts, no servers, no plaintext on disk.
 
 ```bash
-noenvy init              # encrypts .env, stores key in keyring
-noenvy run -- npm start  # decrypts in-memory, injects env vars, runs your command
+noenvy init       # encrypts .env, stores key in keyring
+noenvy npm start  # decrypts in-memory, injects env vars, runs your command
 ```
 
 Works with any language because it runs at the process boundary, not in your code.
@@ -158,17 +158,19 @@ Flags:
 
 The encrypted file is **not designed to be committed** even though it would be safe to. Without the encryption key (which lives only in your local OS keyring and cannot be shared in v1), the file is just opaque bytes. Team sharing is out of scope for v1.
 
-### `noenvy run -- <command>`
+### `noenvy <command>` (aka `noenvy run -- <command>`)
 
 Walks up from the current directory to find the project root, locates the encrypted file (centralized or `--project` mode — either works), decrypts it in memory with the keyring key, and exec's the given command with those secrets in its environment.
 
+`run` is the default command: anything that isn't a noenvy subcommand is treated as a command to run with secrets injected.
+
 ```bash
-noenvy run -- npm start
-noenvy run -- pytest
-noenvy run -- env | grep API_KEY
+noenvy npm start
+noenvy pytest
+noenvy env | grep API_KEY
 ```
 
-The `--` separator is recommended but optional — `noenvy run npm start` works too. Variables from the encrypted file override any same-named variables in the parent environment.
+The explicit form works too, with an optional `--` separator: `noenvy run -- npm start`. Use it when the command you're running shares a name with a noenvy subcommand (e.g. a script called `list`). Variables from the encrypted file override any same-named variables in the parent environment.
 
 Exit code from the child command is propagated.
 
