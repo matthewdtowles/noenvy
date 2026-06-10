@@ -15,8 +15,8 @@ A cross-platform CLI that encrypts your `.env` file with a key stored in your OS
 > Encrypts your `.env` into a `.noenvy` file using a key stored in your OS keyring. Run any command with secrets injected as environment variables. No accounts, no servers, no plaintext.
 >
 > ```bash
-> noenvy init              # encrypts .env, stores key in keyring
-> noenvy run -- npm start  # decrypts in-memory, injects env vars, runs your command
+> noenvy init       # encrypts .env, stores key in keyring
+> noenvy npm start  # decrypts in-memory, injects env vars, runs your command
 > ```
 >
 > Works with any language because it runs at the process boundary, not in your code.
@@ -53,7 +53,7 @@ This is the same threat model as every other local secret tool. Stating it build
 
 ### Core commands
 - `noenvy init` — Read `.env` from current dir, generate encryption key, store in OS keyring, write encrypted file to `~/.noenvy/projects/<project-id>` (default) or to `.noenvy` in the project (with `--project`), add `.env` to `.gitignore` always; add `.noenvy` to `.gitignore` in `--project` mode
-- `noenvy run -- <command>` — Decrypt in-memory, inject as env vars, exec the command, never write plaintext to disk
+- `noenvy run -- <command>` — Decrypt in-memory, inject as env vars, exec the command, never write plaintext to disk. `run` is the default command, so `noenvy <command>` works whenever `<command>` isn't a noenvy subcommand
 - `noenvy list` — Show keys currently stored (default keys-only; `--values` shows redacted form only — full values are never printed)
 - `noenvy set <KEY>` — Hidden-input prompt (or piped stdin) for value; confirm before overwriting existing key (`--force` to skip)
 - `noenvy remove <KEY>` — Delete a key (`--force` to silently succeed if missing). Aliases: `rm`, `unset`
