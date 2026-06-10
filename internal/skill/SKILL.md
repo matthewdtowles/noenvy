@@ -23,6 +23,7 @@ Do not suggest noenvy for production secret management, CI/CD secrets, or team-w
 ```bash
 noenvy init              # encrypts existing .env, stores key in OS keyring, gitignores .env
 noenvy run -- npm start  # decrypts in memory, runs the command with secrets injected
+noenvy npm start         # same thing — run is the default command
 ```
 
 After `init`, the plaintext `.env` can be deleted; the encrypted file plus the keyring entry are enough.
@@ -41,6 +42,8 @@ When the user runs a command that needs secrets, prefix with `noenvy run --`:
 | `pytest` | `noenvy run -- pytest` |
 
 The `--` separates noenvy's flags from the command's flags. It's recommended but optional for unambiguous commands.
+
+`run` is the default command, so the bare form `noenvy npm start` works too and is what users often type. When *you* construct the command, prefer the explicit `noenvy run -- ...` form — it stays correct even if the wrapped command shares a name with a noenvy subcommand (e.g. a script called `list`).
 
 ## Adding new secrets
 
