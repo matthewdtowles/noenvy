@@ -85,12 +85,43 @@ func Read(path string) ([]byte, error) {
 }
 
 // Write writes data to path with restrictive (0600) permissions, creating
-// any missing parent directories (0700) along the way.
+// any missing parent directories (0700) along the way. It writes to a temp
+// file in the same directory and renames it into place, so a crash mid-write
+// can't leave a half-written file, an existing file's looser permissions are
+// never inherited, and a pre-existing symlink at path is replaced rather
+// than written through.
 func Write(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create parent dir for %s: %w", path, err)
 	}
-	return os.WriteFile(path, data, 0o600)
+	tmp, err := os.CreateTemp(dir, ".noenvy-tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return fmt.Errorf("chmod temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("rename %s to %s: %w", tmpPath, path, err)
+	}
+	cleanup = false
+	return nil
 }
 
 // ParseEnv parses a decrypted .env-format payload into a key/value map.
