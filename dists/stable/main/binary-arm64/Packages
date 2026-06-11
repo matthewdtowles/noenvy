@@ -28,3 +28,18 @@ SHA512: 39c88a0095fb426e59971758a9be91faabc36b9763460e2d45cddbc5bede66fde90469b1
 Homepage: https://github.com/matthewdtowles/noenvy
 Description: Encrypt .env files with your OS keyring and inject secrets into any command.
 
+Package: noenvy
+Architecture: arm64
+Version: 0.1.0
+Priority: optional
+Maintainer: Matthew Towles <matthewdtowles@gmail.com>
+Installed-Size: 3712
+Filename: pool/main/n/noenvy/noenvy_0.1.0_linux_arm64.deb
+Size: 1541948
+MD5sum: 29a7e13c0d67050288cadaf16c063ad2
+SHA1: 43d3029932ae8aebcb899274905bd344434317f6
+SHA256: dd1892c2173e936b686648745a959002e541d0a9be08c8837d54c0b4f007868c
+SHA512: fc3364aa2c89e7c9a9cfa4177502fc1b7ce2c10bf4f7cf778e1b6215a5d8d0b81864506ac3fea5c284384d5d219862f581dd6d33ab02e359c01f7749fa0053d2
+Homepage: https://github.com/matthewdtowles/noenvy
+Description: Encrypt .env files with your OS keyring and inject secrets into any command.
+
