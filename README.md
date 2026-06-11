@@ -5,8 +5,8 @@
 Encrypts your `.env` into an encrypted vault using a key stored in your OS keyring. Run any command with secrets injected as environment variables. No accounts, no servers, no plaintext on disk.
 
 ```bash
-noenvy init              # encrypts .env, stores key in keyring
-noenvy run -- npm start  # decrypts in-memory, injects env vars, runs your command
+noenvy init       # encrypts .env, stores key in keyring
+noenvy npm start  # decrypts in-memory, injects env vars, runs your command
 ```
 
 Works with any language because it runs at the process boundary, not in your code.
@@ -158,17 +158,19 @@ Flags:
 
 The encrypted file is **not designed to be committed** even though it would be safe to. Without the encryption key (which lives only in your local OS keyring and cannot be shared in v1), the file is just opaque bytes. Team sharing is out of scope for v1.
 
-### `noenvy run -- <command>`
+### `noenvy <command>` (aka `noenvy run -- <command>`)
 
 Walks up from the current directory to find the project root, locates the encrypted file (centralized or `--project` mode — either works), decrypts it in memory with the keyring key, and exec's the given command with those secrets in its environment.
 
+`run` is the default command: anything that isn't a noenvy subcommand is treated as a command to run with secrets injected.
+
 ```bash
-noenvy run -- npm start
-noenvy run -- pytest
-noenvy run -- env | grep API_KEY
+noenvy npm start
+noenvy pytest
+noenvy env | grep API_KEY
 ```
 
-The `--` separator is recommended but optional — `noenvy run npm start` works too. Variables from the encrypted file override any same-named variables in the parent environment.
+The explicit form works too, with an optional `--` separator: `noenvy run -- npm start`. Use it when the command you're running shares a name with a noenvy subcommand (e.g. a script called `list`). Variables from the encrypted file override any same-named variables in the parent environment.
 
 Exit code from the child command is propagated.
 
@@ -192,7 +194,7 @@ DATABASE_URL=pos***db
 SECRET_TOKEN=***
 ```
 
-Full values are intentionally never printed by `list`. If you need to see the raw value of a key, use `noenvy run -- env | grep KEY` — that puts the exposure decision squarely on you.
+Full values are intentionally never printed by `list`. If you need to see the raw value of a key, use `noenvy run -- env | grep KEY`, or `noenvy export` to write the whole vault back to a plaintext `.env` — either way, the exposure decision is squarely on you.
 
 ### `noenvy set <KEY>`
 
@@ -244,6 +246,20 @@ $ noenvy import .env.staging --remove-source
 Added 4 key(s): AWS_REGION, REDIS_URL, SENTRY_DSN, STRIPE_STAGING_KEY
 Removed .env.staging.
 ```
+
+### `noenvy export`
+
+The inverse of `init`: decrypts the vault and writes every key to `.env` in the current directory, in plaintext. Use it to migrate secrets out of noenvy, or to reconstruct a `.env` you deleted after `init` (e.g. before moving a project directory, since the vault is keyed to the project's absolute path).
+
+Because the output is plaintext, it asks for confirmation first — and warns when it would overwrite an existing `.env`:
+
+```bash
+$ noenvy export
+This will write .env with 4 secret(s) in plaintext. Continue? [y/N]: y
+Wrote 4 key(s) to .env (plaintext).
+```
+
+Pass `--force` (`-f`) to skip the prompt (required in non-interactive use — it refuses to guess). The file is written with `0600` permissions and `.env` is kept in the project's `.gitignore`.
 
 ### `noenvy rotate`
 

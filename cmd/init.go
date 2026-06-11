@@ -118,7 +118,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if len(added) > 0 {
 		fmt.Fprintf(out, "Added to %s/.gitignore: %s\n", displayPath(root, cwd), strings.Join(added, ", "))
 	}
-	fmt.Fprintln(out, "\nNext: noenvy run -- <your command>")
+	fmt.Fprintln(out, "\nNext: noenvy <your command>   (e.g. noenvy npm start)")
 	return nil
 }
 

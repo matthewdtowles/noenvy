@@ -7,8 +7,6 @@ package vault
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/matthewdtowles/noenvy/internal/cryptobox"
@@ -204,38 +202,5 @@ func (v *Vault) Save() error {
 	if err != nil {
 		return err
 	}
-	return atomicWrite(v.path, blob)
-}
-
-// atomicWrite writes data to a temp file in the same directory as path,
-// then renames it into place. Rename is atomic on POSIX filesystems.
-func atomicWrite(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".noenvy-tmp-*")
-	if err != nil {
-		return fmt.Errorf("create temp file in %s: %w", dir, err)
-	}
-	tmpPath := tmp.Name()
-	cleanup := true
-	defer func() {
-		if cleanup {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write temp file: %w", err)
-	}
-	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
-		return fmt.Errorf("chmod temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("rename %s to %s: %w", tmpPath, path, err)
-	}
-	cleanup = false
-	return nil
+	return store.Write(v.path, blob)
 }

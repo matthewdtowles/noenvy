@@ -1,0 +1,91 @@
+name: autotag
+
+# Tags every merge to main with the next semver version, derived from
+# the commit subjects since the last tag (Conventional Commits):
+#
+#   any type + "!"  (feat!:, fix!:)   -> major  (minor while still on 0.x)
+#   feat:                             -> minor
+#   anything else                     -> patch
+#
+# Use squash merge so the PR title becomes the commit subject on main.
+#
+# The tag is pushed with RELEASE_PAT rather than the built-in
+# GITHUB_TOKEN: pushes made with GITHUB_TOKEN do not fire other
+# workflows, so the v* tag would never trigger release.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Serialize runs so two quick merges can't race to compute the same tag.
+concurrency:
+  group: autotag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # Every tag becomes a public release; don't tag a broken commit.
+      - name: Test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Compute and push next tag
+        run: |
+          set -euo pipefail
+
+          last=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          last=${last:-v0.0.0}
+
+          if [ "$(git rev-list -n1 "$last" 2>/dev/null || true)" = "$(git rev-parse HEAD)" ]; then
+            echo "HEAD is already tagged $last; nothing to do."
+            exit 0
+          fi
+
+          if [ "$last" = "v0.0.0" ]; then
+            range=HEAD
+          else
+            range="$last..HEAD"
+          fi
+          subjects=$(git log --format=%s "$range")
+
+          bump=patch
+          if echo "$subjects" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:'; then
+            bump=major
+          elif echo "$subjects" | grep -qE '^feat(\([^)]*\))?:'; then
+            bump=minor
+          fi
+
+          IFS=. read -r major minor patch <<< "${last#v}"
+
+          # While on 0.x, a breaking change bumps minor, not major:
+          # going 1.0.0 should be a deliberate, manual tag.
+          if [ "$bump" = major ] && [ "$major" = 0 ]; then
+            bump=minor
+          fi
+
+          case $bump in
+            major) next="v$((major + 1)).0.0" ;;
+            minor) next="v$major.$((minor + 1)).0" ;;
+            patch) next="v$major.$minor.$((patch + 1))" ;;
+          esac
+
+          echo "last=$last bump=$bump next=$next"
+          git tag "$next"
+          git push origin "$next"
