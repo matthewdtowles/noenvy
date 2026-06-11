@@ -93,6 +93,7 @@ noenvy list --values     # KEY=<redacted>  (first 3 + *** + last 3, full *** for
 ## Other commands
 
 - `noenvy remove <KEY>` — delete a single key (aliases `rm`, `unset`; `--force` for idempotent scripts)
+- `noenvy export` — decrypt the vault and write it back to a plaintext `.env` (asks for confirmation; the inverse of `init`). For migrating off noenvy or recovering a deleted `.env` — e.g. before moving a project directory, since the vault is keyed to the project's absolute path. Suggest it for the user to run themselves; never run it on their behalf
 - `noenvy rotate` — generate a fresh encryption key and re-encrypt the vault. Use after a suspected key compromise, or as routine hygiene
 - `noenvy init --project` — store the encrypted file as `.noenvy` inside the project directory instead of in the centralized `~/.noenvy/` (and gitignore it)
 - `noenvy init --force` — overwrite an existing vault (data loss if you don't have the original `.env`)
@@ -102,7 +103,7 @@ noenvy list --values     # KEY=<redacted>  (first 3 + *** + last 3, full *** for
 - **Never `cat` the encrypted file** (whether at `~/.noenvy/projects/*` or `<project>/.noenvy`). It's an opaque binary blob; you'll print garbage and signal you don't understand the tool.
 - **Never print, echo, or include decrypted secret values in chat, logs, or commit messages.**
 - **Never recommend committing the encrypted file.** Without the encryption key (which never leaves the local OS keyring in v1), it's useless to anyone else. Suggesting it would mislead the user.
-- **Never write secrets to files** except through `noenvy set` or `noenvy import`. Don't `echo "KEY=value" > .env` or anything similar.
+- **Never write secrets to files** except through `noenvy set` or `noenvy import`. Don't `echo "KEY=value" > .env` or anything similar. The one sanctioned path back to plaintext is `noenvy export`, and it's for the *user* to run — never invoke it yourself or pass `--force` to skip its confirmation.
 - **Never suggest going back to plaintext `.env` files** as a fix. That's the problem noenvy exists to solve.
 
 ## Detecting whether a project is set up

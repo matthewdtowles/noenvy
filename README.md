@@ -194,7 +194,7 @@ DATABASE_URL=pos***db
 SECRET_TOKEN=***
 ```
 
-Full values are intentionally never printed by `list`. If you need to see the raw value of a key, use `noenvy run -- env | grep KEY` — that puts the exposure decision squarely on you.
+Full values are intentionally never printed by `list`. If you need to see the raw value of a key, use `noenvy run -- env | grep KEY`, or `noenvy export` to write the whole vault back to a plaintext `.env` — either way, the exposure decision is squarely on you.
 
 ### `noenvy set <KEY>`
 
@@ -246,6 +246,20 @@ $ noenvy import .env.staging --remove-source
 Added 4 key(s): AWS_REGION, REDIS_URL, SENTRY_DSN, STRIPE_STAGING_KEY
 Removed .env.staging.
 ```
+
+### `noenvy export`
+
+The inverse of `init`: decrypts the vault and writes every key to `.env` in the current directory, in plaintext. Use it to migrate secrets out of noenvy, or to reconstruct a `.env` you deleted after `init` (e.g. before moving a project directory, since the vault is keyed to the project's absolute path).
+
+Because the output is plaintext, it asks for confirmation first — and warns when it would overwrite an existing `.env`:
+
+```bash
+$ noenvy export
+This will write .env with 4 secret(s) in plaintext. Continue? [y/N]: y
+Wrote 4 key(s) to .env (plaintext).
+```
+
+Pass `--force` (`-f`) to skip the prompt (required in non-interactive use — it refuses to guess). The file is written with `0600` permissions and `.env` is kept in the project's `.gitignore`.
 
 ### `noenvy rotate`
 
